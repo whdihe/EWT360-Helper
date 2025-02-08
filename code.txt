@@ -1,0 +1,74 @@
+// ==UserScript==
+// @name         升学E网通助手
+// @namespace    https://www.yuzu-soft.com/products.html
+// @version      0.721
+// @description  自动通过随机检查，自动播放下一视频
+// @author       仅供学习交流，严禁用于商业用途，请于24小时内删除
+// @match        https://teacher.ewt360.com/*
+// @grant        none
+//此脚本完全免费，倒卖的人绝对私募了XD
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // 定义一个函数来执行点击“点击通过检查”按钮的操作
+    function clickSpecificSpan() {
+        // 获取所有具有特定类名的span元素
+        const spans = document.querySelectorAll('span.btn-3LStS');
+
+        // 遍历这些元素，找到文本内容为“点击通过检查”的元素并点击
+        spans.forEach(span => {
+            if (span.textContent === '点击通过检查') {
+                span.click();
+            }
+        });
+    }
+
+    // 定义一个函数来处理“重新观看”元素
+    function handleRewatchElement() {
+        // 查找页面中是否存在 "重新观看" 的元素
+        const rewatchElement = document.querySelector('.progress-action-ghost-1cxSL');
+        if (!rewatchElement) {
+            console.log('页面中没有找到 "重新观看" 的元素');
+            return;
+        }
+
+        console.log('找到 "重新观看" 元素，开始查找 item 容器');
+        // 找到包含所有 item 元素的父容器
+        const itemContainer = document.querySelector('.listCon-N9Rlm');
+        if (!itemContainer) {
+            console.log('没有找到包含 item 元素的父容器');
+            return;
+        }
+
+        console.log('找到 item 容器，开始查找激活的 item 元素');
+        // 查找当前激活的 item 元素
+        const activeItem = itemContainer.querySelector('.item-IPNWw.active-1MWMf');
+        if (!activeItem) {
+            console.log('没有找到激活的 item 元素');
+            return;
+        }
+
+        console.log('找到激活的 item 元素，开始查找下一个 item 元素');
+        // 找到激活元素的下一个兄弟节点中的 item 元素
+        let nextItem = activeItem.nextElementSibling;
+        while (nextItem) {
+            if (nextItem.classList.contains('item-IPNWw')) {
+                console.log('找到下一个可点击的 item 元素，执行点击操作');
+                nextItem.click();
+                return;
+            }
+            nextItem = nextItem.nextElementSibling;
+        }
+
+        console.log('没有找到下一个可点击的 item 元素');
+    }
+
+    // 每1秒执行一次点击“点击通过检查”按钮的操作
+    setInterval(clickSpecificSpan, 1000);
+
+    // 每1秒检查一次“重新观看”元素
+    setInterval(handleRewatchElement, 1000);
+})();
+// Ciallo～(∠・ω< )⌒★
