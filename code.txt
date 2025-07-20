@@ -1,189 +1,177 @@
 // ==UserScript==
-// @name         升学E网通助手
+// @name         升学E网通助手「修复版」
 // @namespace    https://www.yuzu-soft.com/products.html
-// @version      0.722
-// @description  自动通过随机检查，自动播放下一视频，带开关控制
-// @author       仅供学习交流，严禁用于商业用途，请于24小时内删除
+// @version      0.723-fix
+// @description  自动通过随机检查、自动播放下一视频、自动跳过选择题，带开关控制
+// @author       此项目是个人为了兴趣而开发, 仅用于学习和测试，请于下载后24小时内删除。
 // @match        https://teacher.ewt360.com/*
 // @grant        none
-//此脚本完全免费，倒卖的人绝对私募了XD
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
-    // 定义开关状态
-    let isCheckEnabled = true;
-    let isRewatchEnabled = true;
-    let checkIntervalId = null;
-    let rewatchIntervalId = null;
+    /* ================== 首次使用弹窗 ================== */
+    const disclaimerKey = 'ewt-helper-disclaimer-accepted';
+    if (!localStorage.getItem(disclaimerKey)) {
+        const msg = [
+            '欢迎使用《升学E网通助手「修复版」》！',
+            '',
+            '⚠️ 免责声明：',
+            '本脚本仅供学习与技术研究使用，禁止用于商业用途；',
+            '使用本脚本造成的任何后果由使用者自行承担。',
+            '',
+            '🚫 特别提醒：',
+            '此脚本为免费开源项目，禁止任何形式的倒卖行为！',
+            '若您为付费获得，请立即退款并举报卖家！',
+            '',
+            '🙏 致敬原作者：',
+            '脚本最初由 ZNink 开源发布，修复版在此向原作者致以崇高敬意！',
+            '',
+            '点击“确定”表示您已阅读并同意上述内容。'
+        ].join('\n');
 
-    // 创建开关控制面板
-    function createControlPanel() {
-        const panel = document.createElement('div');
-        panel.style.position = 'fixed';
-        panel.style.top = '10px';
-        panel.style.left = '50%';
-        panel.style.transform = 'translateX(-50%)';
-        panel.style.zIndex = '9999';
-        panel.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-        panel.style.padding = '10px';
-        panel.style.borderRadius = '50px';
-        panel.style.color = 'white';
-        panel.style.fontSize = '14px';
-        panel.style.display = 'flex';
-        panel.style.alignItems = 'center';
-
-        // 添加 SVG 图标
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.setAttribute('t', '1751943893372');
-        svg.setAttribute('class', 'icon');
-        svg.setAttribute('viewBox', '0 0 1024 1024');
-        svg.setAttribute('version', '1.1');
-        svg.setAttribute('p-id', '4618');
-        svg.setAttribute('width', '40');
-        svg.setAttribute('height', '40');
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        path.setAttribute('d', 'M513.877333 58.666667c247.168 0 448.213333 201.088 448.213334 448.213333 0 247.125333-201.045333 448.213333-448.213334 448.213333-247.125333 0-448.170667-201.088-448.170666-448.213333 0-247.125333 201.045333-448.213333 448.170666-448.213333z m-32 272.042666a81.365333 81.365333 0 0 0-82.218666 0 81.365333 81.365333 0 0 0-41.045334 71.168V631.466667c0 29.696 15.36 56.32 41.045334 71.168 12.842667 7.424 26.922667 11.136 41.088 11.136 14.08 0 28.16-3.712 41.045333-11.136l198.954667-114.773334c25.728-14.890667 41.088-41.514667 41.088-71.210666 0-29.696-15.36-56.32-41.088-71.168z m-41.045333 50.346667c3.072 0 6.570667 0.725333 10.24 2.858667l198.954667 114.858666a20.352 20.352 0 0 1 10.368 17.92 20.266667 20.266667 0 0 1-10.368 17.92l-198.912 114.858667a20.309333 20.309333 0 0 1-20.736 0 20.352 20.352 0 0 1-10.325334-17.92V401.877333a20.906667 20.906667 0 0 1 20.778667-20.778666z');
-        path.setAttribute('fill', '#ffffff');
-        path.setAttribute('p-id', '4619');
-        svg.appendChild(path);
-        panel.appendChild(svg);
-
-        // 创建“点击通过检查”开关按钮
-        const checkButton = document.createElement('button');
-        checkButton.textContent = `自动过检: ${isCheckEnabled ? '开' : '关'}`;
-        checkButton.style.margin = '0 10px';
-        checkButton.style.padding = '5px 10px';
-        checkButton.style.backgroundColor = isCheckEnabled ? '#4CAF50' : '#f44336';
-        checkButton.style.color = 'white';
-        checkButton.style.border = 'none';
-        checkButton.style.borderRadius = '20px';
-        checkButton.style.cursor = 'pointer';
-
-        // 创建“自动连播”开关按钮
-        const rewatchButton = document.createElement('button');
-        rewatchButton.textContent = `自动连播开关: ${isRewatchEnabled ? '开' : '关'}`;
-        rewatchButton.style.margin = '0 10px';
-        rewatchButton.style.padding = '5px 10px';
-        rewatchButton.style.backgroundColor = isRewatchEnabled ? '#4CAF50' : '#f44336';
-        rewatchButton.style.color = 'white';
-        rewatchButton.style.border = 'none';
-        rewatchButton.style.borderRadius = '20px';
-        rewatchButton.style.cursor = 'pointer';
-
-        // 创建 GitHub 超链接按钮
-        const githubButton = document.createElement('a');
-        githubButton.href = 'https://github.com/ZNink/EWT360-Helper';
-        githubButton.textContent = 'Github仓库';
-        githubButton.style.margin = '0 10px';
-        githubButton.style.padding = '5px 10px';
-        githubButton.style.backgroundColor = '#0366d6';
-        githubButton.style.color = 'white';
-        githubButton.style.textDecoration = 'none';
-        githubButton.style.borderRadius = '20px';
-        githubButton.style.display = 'inline-block';
-        githubButton.target = '_blank';
-
-        // 添加开关按钮点击事件
-        checkButton.addEventListener('click', () => {
-            isCheckEnabled = !isCheckEnabled;
-            checkButton.textContent = `自动过检: ${isCheckEnabled ? '开' : '关'}`;
-            checkButton.style.backgroundColor = isCheckEnabled ? '#4CAF50' : '#f44336';
-            toggleCheckInterval();
-        });
-
-        rewatchButton.addEventListener('click', () => {
-            isRewatchEnabled = !isRewatchEnabled;
-            rewatchButton.textContent = `自动连播开关: ${isRewatchEnabled ? '开' : '关'}`;
-            rewatchButton.style.backgroundColor = isRewatchEnabled ? '#4CAF50' : '#f44336';
-            toggleRewatchInterval();
-        });
-
-        // 将元素添加到面板
-        panel.appendChild(checkButton);
-        panel.appendChild(rewatchButton);
-        panel.appendChild(githubButton);
-        document.body.appendChild(panel);
-    }
-
-    // 控制“点击通过检查”间隔检查
-    function toggleCheckInterval() {
-        if (isCheckEnabled && !checkIntervalId) {
-            checkIntervalId = setInterval(clickSpecificSpan, 1000);
-        } else if (!isCheckEnabled && checkIntervalId) {
-            clearInterval(checkIntervalId);
-            checkIntervalId = null;
-        }
-    }
-
-    // 控制“自动连播”间隔检查
-    function toggleRewatchInterval() {
-        if (isRewatchEnabled && !rewatchIntervalId) {
-            rewatchIntervalId = setInterval(handleRewatchElement, 1000);
-        } else if (!isRewatchEnabled && rewatchIntervalId) {
-            clearInterval(rewatchIntervalId);
-            rewatchIntervalId = null;
-        }
-    }
-
-    // 定义一个函数来执行点击“点击通过检查”按钮的操作
-    function clickSpecificSpan() {
-        // 获取所有具有特定类名的span元素
-        const spans = document.querySelectorAll('span.btn-3LStS');
-
-        // 遍历这些元素，找到文本内容为“点击通过检查”的元素并点击
-        spans.forEach(span => {
-            if (span.textContent === '点击通过检查') {
-                span.click();
-            }
-        });
-    }
-
-    // 定义一个函数来处理“自动连播”元素
-    function handleRewatchElement() {
-        // 查找页面中是否存在 "自动连播" 的元素
-        const rewatchElement = document.querySelector('.progress-action-ghost-1cxSL');
-        if (!rewatchElement) {
-            console.log('页面中没有找到 "自动连播" 的元素');
+        if (confirm(msg)) {
+            localStorage.setItem(disclaimerKey, 'true');
+        } else {
+            alert('您已取消使用，脚本将不会运行。');
             return;
         }
-
-        console.log('找到 "自动连播" 元素，开始查找 item 容器');
-        // 找到包含所有 item 元素的父容器
-        const itemContainer = document.querySelector('.listCon-N9Rlm');
-        if (!itemContainer) {
-            console.log('没有找到包含 item 元素的父容器');
-            return;
-        }
-
-        console.log('找到 item 容器，开始查找激活的 item 元素');
-        // 查找当前激活的 item 元素
-        const activeItem = itemContainer.querySelector('.item-IPNWw.active-1MWMf');
-        if (!activeItem) {
-            console.log('没有找到激活的 item 元素');
-            return;
-        }
-
-        console.log('找到激活的 item 元素，开始查找下一个 item 元素');
-        // 找到激活元素的下一个兄弟节点中的 item 元素
-        let nextItem = activeItem.nextElementSibling;
-        while (nextItem) {
-            if (nextItem.classList.contains('item-IPNWw')) {
-                console.log('找到下一个可点击的 item 元素，执行点击操作');
-                nextItem.click();
-                return;
-            }
-            nextItem = nextItem.nextElementSibling;
-        }
-
-        console.log('没有找到下一个可点击的 item 元素');
     }
 
-    // 初始化
-    createControlPanel();
-    toggleCheckInterval();
-    toggleRewatchInterval();
+    /* ================== 开关状态 ================== */
+    let isCheckEnabled   = true;   // 自动过检
+    let isRewatchEnabled = true;   // 自动连播
+    let isSkipEnabled    = true;   // 自动跳过选择
 
+    /* ================== 面板创建 ================== */
+    const panel = document.createElement('div');
+    panel.id = 'ewt-helper-panel';
+    panel.style.position = 'fixed';
+    panel.style.top = '10px';
+    panel.style.left = '50%';
+    panel.style.transform = 'translateX(-50%)';
+    panel.style.zIndex = '9999';
+    panel.style.backgroundColor = 'rgba(0,0,0,0.5)';
+    panel.style.padding = '10px';
+    panel.style.borderRadius = '25px';
+    panel.style.color = '#fff';
+    panel.style.fontSize = '14px';
+    panel.style.display = 'flex';
+    panel.style.alignItems = 'center';
+    panel.style.gap = '10px';
+    document.documentElement.appendChild(panel);
+
+    /* ============ 通用：创建开关按钮 ============ */
+    function createToggle(text, enabled, callback) {
+        const btn = document.createElement('button');
+        btn.textContent = `${text}: ${enabled ? '开' : '关'}`;
+        btn.style.padding = '5px 10px';
+        btn.style.border = 'none';
+        btn.style.borderRadius = '15px';
+        btn.style.cursor = 'pointer';
+        btn.style.color = '#fff';
+        btn.style.backgroundColor = enabled ? '#4CAF50' : '#f44336';
+        btn.addEventListener('click', () => {
+            const newState = !enabled;
+            callback(newState);
+            enabled = newState;
+            btn.textContent = `${text}: ${enabled ? '开' : '关'}`;
+            btn.style.backgroundColor = enabled ? '#4CAF50' : '#f44336';
+        });
+        return btn;
+    }
+
+    /* =============== 各功能实现 =============== */
+    let checkId   = null;
+    let watchId   = null;
+    let skipId    = null;
+
+    /* 1. 自动过检 */
+    function toggleCheck(enable) {
+        if (enable && !checkId) {
+            checkId = setInterval(() => {
+                const span = [...document.querySelectorAll('span')].find(el => el.textContent === '点击通过检查');
+                if (span) span.click();
+            }, 1000);
+        } else if (!enable && checkId) {
+            clearInterval(checkId);
+            checkId = null;
+        }
+    }
+
+    /* 2. 自动连播 */
+    function toggleRewatch(enable) {
+        if (enable && !watchId) {
+            watchId = setInterval(() => {
+                const rewatchBtn = document.querySelector('.progress-action-ghost-1cxSL');
+                if (!rewatchBtn) return;
+
+                const container = document.querySelector('.listCon-N9Rlm');
+                if (!container) return;
+
+                const active = container.querySelector('.item-IPNWw.active-1MWMf');
+                if (!active) return;
+
+                let next = active.nextElementSibling;
+                while (next && !next.classList.contains('item-IPNWw')) next = next.nextElementSibling;
+                if (next) next.click();
+            }, 1000);
+        } else if (!enable && watchId) {
+            clearInterval(watchId);
+            watchId = null;
+        }
+    }
+
+    /* 3. 自动跳过选择 */
+    function toggleSkip(enable) {
+        if (enable && !skipId) {
+            skipId = setInterval(() => {
+                /* 优先点“跳过”按钮 */
+                const skipBtn = [...document.querySelectorAll('button,span,a,div')]
+                    .find(el => el.textContent.trim() === '跳过');
+                if (skipBtn) {
+                    skipBtn.click();
+                    return;
+                }
+
+                /* 无“跳过”，则尝试自动答题 */
+                const radio = document.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.click();
+                    setTimeout(() => {
+                        const nextBtn = [...document.querySelectorAll('button,span,a,div')]
+                            .find(el => /下一题|提交|确定/i.test(el.textContent.trim()));
+                        if (nextBtn) nextBtn.click();
+                    }, 200);
+                }
+            }, 1000);
+        } else if (!enable && skipId) {
+            clearInterval(skipId);
+            skipId = null;
+        }
+    }
+
+    /* =============== 把按钮加到面板 =============== */
+    panel.appendChild(createToggle('自动过检', isCheckEnabled, toggleCheck));
+    panel.appendChild(createToggle('自动连播', isRewatchEnabled, toggleRewatch));
+    panel.appendChild(createToggle('自动跳过选择', isSkipEnabled, toggleSkip));
+
+    /* GitHub 链接 */
+    const gh = document.createElement('a');
+    gh.href = 'https://github.com/ZNink/EWT360-Helper';
+    gh.target = '_blank';
+    gh.textContent = 'GitHub';
+    gh.style.color = '#fff';
+    gh.style.backgroundColor = '#0366d6';
+    gh.style.padding = '5px 10px';
+    gh.style.borderRadius = '15px';
+    gh.style.textDecoration = 'none';
+    panel.appendChild(gh);
+
+    /* =============== 初始启动 =============== */
+    toggleCheck(isCheckEnabled);
+    toggleRewatch(isRewatchEnabled);
+    toggleSkip(isSkipEnabled);
 })();
-// Ciallo～(∠・ω< )⌒★
+// Ciallo～(∠�9�9ω< )⌒★
